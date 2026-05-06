@@ -5,6 +5,13 @@ import { APP_GUARD } from '@nestjs/core';
 
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ProductsModule } from './products/products.module';
+import { CartModule } from './cart/cart.module';
+import { OrdersModule } from './orders/orders.module';
+import { AdminModule } from './admin/admin.module';
+import { ProfileModule } from './profile/profile.module';
+import { UploadModule } from './upload/upload.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -27,17 +34,22 @@ import { RolesGuard } from './auth/guards/roles.guard';
     }),
     UsersModule,
     AuthModule,
+    CategoriesModule,
+    ProductsModule,
+    CartModule,
+    OrdersModule,
+    AdminModule,
+    ProfileModule,
+    UploadModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
-      // ↑ Every route is now protected by default (requires valid JWT).
     },
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
-      // ↑ RolesGuard runs after JwtAuthGuard on every route.
     },
   ],
 })

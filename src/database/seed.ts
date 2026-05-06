@@ -40,7 +40,6 @@ async function seed() {
     throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env');
   }
 
-  // Hash FIRST, then create — so the value is resolved before passing in
   const hashedPassword = await bcrypt.hash(adminPassword, 12);
 
   const admin = userRepo.create({
