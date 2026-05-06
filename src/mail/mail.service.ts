@@ -99,7 +99,7 @@ export class MailService {
 
   async sendSellerInvite(to: string, name: string, token: string): Promise<void> {
     const appUrl = this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
-    const setupLink = `${appUrl}/seller/setup?token=${token}`;
+    const setupLink = `${appUrl}/seller-setup?token=${token}`;
 
     // In dev with no SMTP configured, log the link so you can still test
     if (!this.transporter) {
