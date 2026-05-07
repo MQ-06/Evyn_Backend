@@ -5,12 +5,17 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  MessageEvent,
   Param,
   Patch,
   Post,
   Query,
+  Sse,
 } from '@nestjs/common';
-import { ProductsService } from './products.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Observable, fromEvent } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { ProductsService, PRODUCT_CHANGED } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
@@ -21,7 +26,10 @@ import { Role } from '../users/enums/role.enum';
 
 @Controller()
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   // ─── PUBLIC ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +37,15 @@ export class ProductsController {
   @Get('products')
   findAll(@Query() query: ProductQueryDto) {
     return this.productsService.findAll(query);
+  }
+
+  // SSE — must be declared before products/:slug to avoid slug matching "events"
+  @Public()
+  @Sse('products/events')
+  productEvents(): Observable<MessageEvent> {
+    return fromEvent(this.eventEmitter, PRODUCT_CHANGED).pipe(
+      map((data) => ({ data }) as MessageEvent),
+    );
   }
 
   @Public()

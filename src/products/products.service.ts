@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Product } from './entities/product.entity';
@@ -13,12 +14,15 @@ import { ProductQueryDto, SortOption } from './dto/product-query.dto';
 import { CategoriesService } from '../categories/categories.service';
 import { Role } from '../users/enums/role.enum';
 
+export const PRODUCT_CHANGED = 'product.changed';
+
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
     private readonly categoriesService: CategoriesService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(sellerId: string, dto: CreateProductDto): Promise<Product> {
@@ -37,7 +41,9 @@ export class ProductsService {
       sellerId,
     });
 
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    this.eventEmitter.emit(PRODUCT_CHANGED, { type: 'created', product: saved });
+    return saved;
   }
 
   async findAll(query: ProductQueryDto) {
@@ -105,18 +111,24 @@ export class ProductsService {
     if (dto.images !== undefined) product.images = dto.images;
     if (dto.isActive !== undefined) product.isActive = dto.isActive;
 
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    this.eventEmitter.emit(PRODUCT_CHANGED, { type: 'updated', product: saved });
+    return saved;
   }
 
   async remove(id: string, sellerId: string, role: Role): Promise<void> {
     const product = await this.findOneOwned(id, sellerId, role);
+    const productId = product.id;
     await this.productRepo.remove(product);
+    this.eventEmitter.emit(PRODUCT_CHANGED, { type: 'deleted', productId });
   }
 
   async toggleActive(id: string, sellerId: string, role: Role): Promise<Product> {
     const product = await this.findOneOwned(id, sellerId, role);
     product.isActive = !product.isActive;
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    this.eventEmitter.emit(PRODUCT_CHANGED, { type: 'toggled', product: saved });
+    return saved;
   }
 
   // ─── PRIVATE HELPERS ──────────────────────────────────────────────────────────
