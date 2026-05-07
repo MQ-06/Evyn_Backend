@@ -11,11 +11,11 @@ export class MailService {
     const host = this.config.get<string>('MAIL_HOST');
 
     if (host) {
-      const port = this.config.get<number>('MAIL_PORT') ?? 587;
+      const port = +(this.config.get('MAIL_PORT') ?? 587); // cast to number — ConfigService returns strings
       this.transporter = nodemailer.createTransport({
         host,
         port,
-        secure: port === 465, // true for SSL (port 465), false for STARTTLS (port 587)
+        secure: port === 465,
         auth: {
           user: this.config.get<string>('MAIL_USER'),
           pass: this.config.get<string>('MAIL_PASS'),
