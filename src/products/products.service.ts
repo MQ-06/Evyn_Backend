@@ -90,6 +90,18 @@ export class ProductsService {
     });
   }
 
+  async findOneBySeller(id: string, sellerId: string, role: Role): Promise<Product> {
+    const product = await this.productRepo.findOne({
+      where: { id },
+      relations: ['category'],
+    });
+    if (!product) throw new NotFoundException('Product not found');
+    if (product.sellerId !== sellerId && role !== Role.ADMIN) {
+      throw new ForbiddenException('You can only view your own products');
+    }
+    return product;
+  }
+
   async update(
     id: string,
     sellerId: string,

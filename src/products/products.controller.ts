@@ -70,6 +70,12 @@ export class ProductsController {
   }
 
   @Roles(Role.SELLER, Role.ADMIN)
+  @Get('seller/products/:id')
+  findOneForSeller(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.productsService.findOneBySeller(id, user.id, user.role);
+  }
+
+  @Roles(Role.SELLER, Role.ADMIN)
   @Patch('seller/products/:id')
   update(
     @Param('id') id: string,
