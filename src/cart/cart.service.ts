@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,60 +24,69 @@ export class CartService {
   // ─── GET CART ──────────────────────────────────────────────────────────────────
 
   async getCart(userId: string) {
-    const items = await this.cartItemRepo.find({
-      where: { userId },
-      relations: ['product', 'product.seller', 'product.category'],
-      order: { createdAt: 'ASC' },
-    });
+    try {
+      const items = await this.cartItemRepo.find({
+        where: { userId },
+        relations: ['product', 'product.seller', 'product.category'],
+        order: { createdAt: 'ASC' },
+      });
 
-    const subtotal = items.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
-      0,
-    );
+      const subtotal = items.reduce(
+        (sum, item) => sum + item.product.price * item.quantity,
+        0,
+      );
 
-    return {
-      items,
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
-    };
+      return {
+        items,
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+      };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch cart');
+    }
   }
 
   // ─── ADD TO CART ───────────────────────────────────────────────────────────────
 
   async addToCart(userId: string, dto: AddToCartDto): Promise<CartItem> {
-    const product = await this.productRepo.findOne({
-      where: { id: dto.productId, isActive: true },
-    });
+    try {
+      const product = await this.productRepo.findOne({
+        where: { id: dto.productId, isActive: true },
+      });
 
-    if (!product) throw new NotFoundException('Product not found or no longer available');
-    if (product.stock < 1) throw new BadRequestException('Product is out of stock');
+      if (!product) throw new NotFoundException('Product not found or no longer available');
+      if (product.stock < 1) throw new BadRequestException('Product is out of stock');
 
-    // If product already in cart, merge quantities
-    const existing = await this.cartItemRepo.findOne({
-      where: { userId, productId: dto.productId },
-    });
+      const existing = await this.cartItemRepo.findOne({
+        where: { userId, productId: dto.productId },
+      });
 
-    if (existing) {
-      const merged = existing.quantity + dto.quantity;
-      if (merged > product.stock) {
-        throw new BadRequestException(
-          `You already have ${existing.quantity} in your cart. Only ${product.stock - existing.quantity} more available.`,
-        );
+      if (existing) {
+        const merged = existing.quantity + dto.quantity;
+        if (merged > product.stock) {
+          throw new BadRequestException(
+            `You already have ${existing.quantity} in your cart. Only ${product.stock - existing.quantity} more available.`,
+          );
+        }
+        existing.quantity = merged;
+        return this.cartItemRepo.save(existing);
       }
-      existing.quantity = merged;
-      return this.cartItemRepo.save(existing);
-    }
 
-    if (dto.quantity > product.stock) {
-      throw new BadRequestException(`Only ${product.stock} items in stock`);
-    }
+      if (dto.quantity > product.stock) {
+        throw new BadRequestException(`Only ${product.stock} items in stock`);
+      }
 
-    const item = this.cartItemRepo.create({
-      userId,
-      productId: dto.productId,
-      quantity: dto.quantity,
-    });
-    return this.cartItemRepo.save(item);
+      const item = this.cartItemRepo.create({
+        userId,
+        productId: dto.productId,
+        quantity: dto.quantity,
+      });
+      return this.cartItemRepo.save(item);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to add item to cart');
+    }
   }
 
   // ─── UPDATE QUANTITY ───────────────────────────────────────────────────────────
@@ -85,32 +96,47 @@ export class CartService {
     itemId: string,
     dto: UpdateCartItemDto,
   ): Promise<CartItem> {
-    const item = await this.cartItemRepo.findOne({ where: { id: itemId, userId } });
-    if (!item) throw new NotFoundException('Cart item not found');
+    try {
+      const item = await this.cartItemRepo.findOne({ where: { id: itemId, userId } });
+      if (!item) throw new NotFoundException('Cart item not found');
 
-    const product = await this.productRepo.findOne({ where: { id: item.productId } });
-    if (!product || !product.isActive) {
-      throw new BadRequestException('Product is no longer available');
-    }
-    if (dto.quantity > product.stock) {
-      throw new BadRequestException(`Only ${product.stock} items in stock`);
-    }
+      const product = await this.productRepo.findOne({ where: { id: item.productId } });
+      if (!product || !product.isActive) {
+        throw new BadRequestException('Product is no longer available');
+      }
+      if (dto.quantity > product.stock) {
+        throw new BadRequestException(`Only ${product.stock} items in stock`);
+      }
 
-    item.quantity = dto.quantity;
-    return this.cartItemRepo.save(item);
+      item.quantity = dto.quantity;
+      return this.cartItemRepo.save(item);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to update cart item');
+    }
   }
 
   // ─── REMOVE ITEM ───────────────────────────────────────────────────────────────
 
   async removeItem(userId: string, itemId: string): Promise<void> {
-    const item = await this.cartItemRepo.findOne({ where: { id: itemId, userId } });
-    if (!item) throw new NotFoundException('Cart item not found');
-    await this.cartItemRepo.remove(item);
+    try {
+      const item = await this.cartItemRepo.findOne({ where: { id: itemId, userId } });
+      if (!item) throw new NotFoundException('Cart item not found');
+      await this.cartItemRepo.remove(item);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to remove cart item');
+    }
   }
 
   // ─── CLEAR ENTIRE CART (called by OrdersService after checkout) ────────────────
 
   async clearCart(userId: string): Promise<void> {
-    await this.cartItemRepo.delete({ userId });
+    try {
+      await this.cartItemRepo.delete({ userId });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to clear cart');
+    }
   }
 }

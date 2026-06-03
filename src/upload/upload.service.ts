@@ -16,23 +16,28 @@ export class UploadService implements OnModuleInit {
   }
 
   async uploadImage(file: Express.Multer.File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const upload = cloudinary.uploader.upload_stream(
-        {
-          folder: 'evyn/products',
-          resource_type: 'image',
-          transformation: [{ width: 1200, crop: 'limit', quality: 'auto', fetch_format: 'auto' }],
-        },
-        (error, result) => {
-          if (error || !result) {
-            reject(new InternalServerErrorException('Image upload failed'));
-          } else {
-            resolve(result.secure_url);
-          }
-        },
-      );
+    try {
+      return await new Promise((resolve, reject) => {
+        const upload = cloudinary.uploader.upload_stream(
+          {
+            folder: 'evyn/products',
+            resource_type: 'image',
+            transformation: [{ width: 1200, crop: 'limit', quality: 'auto', fetch_format: 'auto' }],
+          },
+          (error, result) => {
+            if (error || !result) {
+              reject(new InternalServerErrorException('Image upload failed'));
+            } else {
+              resolve(result.secure_url);
+            }
+          },
+        );
 
-      Readable.from(file.buffer).pipe(upload);
-    });
+        Readable.from(file.buffer).pipe(upload);
+      });
+    } catch (error) {
+      if (error instanceof InternalServerErrorException) throw error;
+      throw new InternalServerErrorException('Image upload failed');
+    }
   }
 }

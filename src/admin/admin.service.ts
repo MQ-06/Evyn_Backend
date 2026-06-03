@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -25,46 +27,91 @@ export class AdminService {
   // ─── SELLERS ──────────────────────────────────────────────────────────────────
 
   async listSellers() {
-    return this.listUsersWithStats(Role.SELLER);
+    try {
+      return await this.listUsersWithStats(Role.SELLER);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch sellers');
+    }
   }
 
   async getSeller(id: string) {
-    return this.getUserWithStats(id, Role.SELLER);
+    try {
+      return await this.getUserWithStats(id, Role.SELLER);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch seller');
+    }
   }
 
   async toggleSeller(id: string) {
-    return this.toggleUserActive(id, Role.SELLER);
+    try {
+      return await this.toggleUserActive(id, Role.SELLER);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to toggle seller status');
+    }
   }
 
   async deleteSeller(id: string, requesterId: string) {
-    return this.deleteUser(id, Role.SELLER, requesterId);
+    try {
+      return await this.deleteUser(id, Role.SELLER, requesterId);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to delete seller');
+    }
   }
 
   // ─── BUYERS ───────────────────────────────────────────────────────────────────
 
   async listBuyers() {
-    return this.listUsersWithStats(Role.BUYER);
+    try {
+      return await this.listUsersWithStats(Role.BUYER);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch buyers');
+    }
   }
 
   async getBuyer(id: string) {
-    return this.getUserWithStats(id, Role.BUYER);
+    try {
+      return await this.getUserWithStats(id, Role.BUYER);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch buyer');
+    }
   }
 
   async toggleBuyer(id: string) {
-    return this.toggleUserActive(id, Role.BUYER);
+    try {
+      return await this.toggleUserActive(id, Role.BUYER);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to toggle buyer status');
+    }
   }
 
   async deleteBuyer(id: string, requesterId: string) {
-    return this.deleteUser(id, Role.BUYER, requesterId);
+    try {
+      return await this.deleteUser(id, Role.BUYER, requesterId);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to delete buyer');
+    }
   }
 
   // ─── PRODUCTS ─────────────────────────────────────────────────────────────────
 
   async listAllProducts() {
-    return this.productRepo.find({
-      relations: ['category', 'seller'],
-      order: { createdAt: 'DESC' },
-    });
+    try {
+      return await this.productRepo.find({
+        relations: ['category', 'seller'],
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch products');
+    }
   }
 
   // ─── PRIVATE HELPERS ──────────────────────────────────────────────────────────
@@ -84,19 +131,27 @@ export class AdminService {
   }
 
   private async attachStats(user: User, role: Role) {
-    let productCount = 0;
-    let orderCount = 0;
+    const stats = role === Role.SELLER ? await this.getSellerStats(user.id) : null;
+    return this.formatUserResponse(user, role, stats);
+  }
 
-    if (role === Role.SELLER) {
-      productCount = await this.productRepo.count({ where: { sellerId: user.id } });
-      const sellerItems = await this.orderItemRepo.find({
-        where: { sellerId: user.id },
-        select: { orderId: true },
-      });
-      const uniqueOrders = new Set(sellerItems.map((i) => i.orderId));
-      orderCount = uniqueOrders.size;
-    }
+  private async getSellerStats(
+    sellerId: string,
+  ): Promise<{ productCount: number; orderCount: number }> {
+    const productCount = await this.productRepo.count({ where: { sellerId } });
+    const sellerItems = await this.orderItemRepo.find({
+      where: { sellerId },
+      select: { orderId: true },
+    });
+    const orderCount = new Set(sellerItems.map((i) => i.orderId)).size;
+    return { productCount, orderCount };
+  }
 
+  private formatUserResponse(
+    user: User,
+    role: Role,
+    stats: { productCount: number; orderCount: number } | null,
+  ) {
     return {
       id: user.id,
       name: user.name,
@@ -106,7 +161,7 @@ export class AdminService {
       businessName: user.businessName,
       isActive: user.isActive,
       createdAt: user.createdAt,
-      ...(role === Role.SELLER && { productCount, orderCount }),
+      ...(role === Role.SELLER && stats && { ...stats }),
     };
   }
 

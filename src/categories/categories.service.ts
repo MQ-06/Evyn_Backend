@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
@@ -12,25 +18,40 @@ export class CategoriesService {
   ) {}
 
   async create(dto: CreateCategoryDto): Promise<Category> {
-    const slug = dto.slug ?? this.toSlug(dto.name);
+    try {
+      const slug = dto.slug ?? this.toSlug(dto.name);
 
-    const existing = await this.categoryRepo.findOne({
-      where: [{ name: dto.name }, { slug }],
-    });
-    if (existing) throw new ConflictException('Category name or slug already exists');
+      const existing = await this.categoryRepo.findOne({
+        where: [{ name: dto.name }, { slug }],
+      });
+      if (existing) throw new ConflictException('Category name or slug already exists');
 
-    const category = this.categoryRepo.create({ name: dto.name, slug });
-    return this.categoryRepo.save(category);
+      const category = this.categoryRepo.create({ name: dto.name, slug });
+      return await this.categoryRepo.save(category);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to create category');
+    }
   }
 
   async findAll(): Promise<Category[]> {
-    return this.categoryRepo.find({ order: { name: 'ASC' } });
+    try {
+      return await this.categoryRepo.find({ order: { name: 'ASC' } });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch categories');
+    }
   }
 
   async findOne(id: string): Promise<Category> {
-    const category = await this.categoryRepo.findOne({ where: { id } });
-    if (!category) throw new NotFoundException('Category not found');
-    return category;
+    try {
+      const category = await this.categoryRepo.findOne({ where: { id } });
+      if (!category) throw new NotFoundException('Category not found');
+      return category;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch category');
+    }
   }
 
   private toSlug(name: string): string {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -9,39 +9,64 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    // It has built-in methods: find, findOne, save, update, delete, etc.
   ) {}
 
-  // Find a user by their email address.
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepo.findOne({ where: { email } });
+    try {
+      return await this.userRepo.findOne({ where: { email } });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to find user by email');
+    }
   }
 
   async findById(id: string): Promise<User | null> {
-    return this.userRepo.findOne({ where: { id } });
+    try {
+      return await this.userRepo.findOne({ where: { id } });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to find user');
+    }
   }
 
   async findByInviteToken(token: string): Promise<User | null> {
-    return this.userRepo.findOne({ where: { inviteToken: token } });
-  }
-
-  // Create and save a new user.
-  async create(data: Partial<User>): Promise<User> {
-    const user = this.userRepo.create(data);
-    return this.userRepo.save(user);
-  }
-
-  // Update any fields on a user by their id.
- async update(id: string, data: Partial<User>): Promise<User | null> {
-  await this.userRepo.update(id, data);
-  return this.findById(id);
-}   
-
-  // Get all users — optionally filtered by role.
-  async findAll(role?: string): Promise<User[]> {
-    if (role) {
-      return this.userRepo.find({ where: { role: role as any } });
+    try {
+      return await this.userRepo.findOne({ where: { inviteToken: token } });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to find user by invite token');
     }
-    return this.userRepo.find();
+  }
+
+  async create(data: Partial<User>): Promise<User> {
+    try {
+      const user = this.userRepo.create(data);
+      return await this.userRepo.save(user);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to create user');
+    }
+  }
+
+  async update(id: string, data: Partial<User>): Promise<User | null> {
+    try {
+      await this.userRepo.update(id, data);
+      return this.findById(id);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to update user');
+    }
+  }
+
+  async findAll(role?: string): Promise<User[]> {
+    try {
+      if (role) {
+        return await this.userRepo.find({ where: { role: role as any } });
+      }
+      return await this.userRepo.find();
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException('Failed to fetch users');
+    }
   }
 }
